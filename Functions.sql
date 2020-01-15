@@ -53,7 +53,6 @@ END;
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- Zapewnienie ze po dodaniu nowego pracownika zostanie wpisany 3miesięczny okres próbny
 
-USE HR_Bendig_Pecyna_Szubert_Michalak;
 GO
 
 CREATE TRIGGER ThreeMonthsTrialContract ON Employees AFTER INSERT AS BEGIN
@@ -67,19 +66,18 @@ IF ((SELECT Job_history.work_experience FROM Job_history WHERE Job_history.emplo
 ELSE
 	SET @vacation = 20
 
-INSERT INTO Contracts(employee_id, hire_date, end_date, vacation_days) VALUES (@lastId, GETDATE(), DATEADD(MONTH, 3, GETDATE()), @vacation)
-
+IF ((SELECT COUNT(contract_id) FROM Contracts WHERE employee_id = @lastId) = 0)
+	BEGIN
+	INSERT INTO Contracts(employee_id, hire_date, end_date, vacation_days) VALUES (@lastId, GETDATE(), DATEADD(MONTH, 3, GETDATE()), @vacation)
+	END;
 END;
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- Zapewnienie aby po zmianie stanowiska pensja jest większa/równa minimalnym widełkom.
 
-
-
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- Obliczenie średniej ilości pracy zdalnej
 
-USE HR_Bendig_Pecyna_Szubert_Michalak;
 GO
 
 CREATE OR ALTER FUNCTION AverageRemoteWork(
@@ -124,7 +122,6 @@ GO
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- Możliwość przyznania podwyżki wszystkim pracownikom na raz. Podwyżka przyznawana procentowo na bazie obecnych zarobków każdego pracownika
 
-USE HR_Bendig_Pecyna_Szubert_Michalak;
 GO
 
 CREATE OR ALTER PROCEDURE RiseToAllWorkers(
@@ -140,7 +137,7 @@ AS
 	FETCH NEXT FROM Kursor INTO @employee
 	WHILE @@FETCH_STATUS = 0
 	BEGIN
-		UPDATE Employees SET salary += salary * @rise_percentage WHERE employee_id = @employee 
+		UPDATE Contracts SET salary += salary * @rise_percentage WHERE employee_id = @employee AND contract_id = (SELECT TOP 1 contract_id FROM Contracts WHERE employee_id = @employee ORDER BY end_date DESC)
 		FETCH NEXT FROM Kursor INTO @employee
 	END
 
@@ -156,7 +153,6 @@ GO
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- Możliwość przyznania podwyżki pojedyńczemu pracownikowi. Można wpisać interesująca wysokość podwyżki
 
-USE HR_Bendig_Pecyna_Szubert_Michalak;
 GO
 
 CREATE OR ALTER PROCEDURE RiseToOneWorker(
@@ -166,7 +162,7 @@ CREATE OR ALTER PROCEDURE RiseToOneWorker(
 AS
  BEGIN
 	DECLARE @rise_percentage DECIMAL(5,2) = @rise * 0.01
-	UPDATE Employees SET salary += salary * @rise_percentage WHERE employee_id = @employee 	
+		UPDATE Contracts SET salary += salary * @rise_percentage WHERE employee_id = @employee AND contract_id = (SELECT TOP 1 contract_id FROM Contracts WHERE employee_id = @employee ORDER BY end_date DESC)
  END
 GO
 
@@ -177,7 +173,6 @@ GO
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- Wyliczenie dni urlopu pracownikowi pracującemu niepełny rok.
 
-USE HR_Bendig_Pecyna_Szubert_Michalak;
 GO
 
 CREATE OR ALTER FUNCTION CalculateVacationDays(
@@ -200,3 +195,32 @@ GO
 
 SELECT DISTINCT employee_id, dbo.CalculateVacationDays(employee_id) as 'Vacation Days Left' FROM Employees 
 GO 
+
+
+--------------------------------------------------------------------------------------------------------------------
+---- Utworzenie job history dla nowego pracownika
+GO
+
+CREATE TRIGGER CreateJobHistoryForNewEmployee ON Employees AFTER INSERT AS BEGIN
+DECLARE @employeeId INT;
+SET @employeeId = (SELECT employee_id FROM inserted);
+
+INSERT INTO Job_history(employee_id, vacation_used, remote_work_used, sick_days_used, work_experience) VALUES (@employeeId, 0, 0, 0, 0)
+
+END;
+GO
+
+----- Aktualizacja doświadczenia przy dodaniu nowej umowy o pracę ------------------------------------------------------------------
+CREATE TRIGGER UpdateWorkExperience ON Contracts AFTER INSERT AS BEGIN
+DECLARE @employeeId INT;
+DECLARE @experience_old INT;
+DECLARE @experience_add INT;
+
+SET @employeeId = (SELECT employee_id FROM inserted);
+SET @experience_add = (SELECT DATEDIFF(MONTH, end_date, hire_date) FROM Contracts WHERE Contracts.employee_id = @employeeId);
+SET @experience_old = (SELECT work_experience FROM Job_history WHERE Job_history.employee_id = @employeeId);
+
+UPDATE Job_history SET work_experience = @experience_old + @experience_add WHERE Job_history.employee_id = @employeeId;
+
+END;
+

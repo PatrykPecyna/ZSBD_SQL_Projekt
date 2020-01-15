@@ -7,10 +7,8 @@ CREATE TABLE HR_Bendig_Pecyna_Szubert_Michalak..Employees(
 	employee_id		int				IDENTITY(1,1),
 	first_name		varchar(20),
 	last_name		varchar(20),
-	phone_number	varchar(9),
-	salary			money,
+	phone_number	varchar(12),
 	team_id			int,
-	position_id		int,
 
 	CONSTRAINT PK_employee_id PRIMARY KEY (employee_id),
 );
@@ -48,15 +46,28 @@ CREATE TABLE HR_Bendig_Pecyna_Szubert_Michalak..Sick_leave(
 	CONSTRAINT FKsick_leave_employee_id FOREIGN KEY (employee_id) REFERENCES HR_Bendig_Pecyna_Szubert_Michalak..Employees (employee_id)
 );
 
+CREATE TABLE HR_Bendig_Pecyna_Szubert_Michalak..Positions(
+	position_id		int				IDENTITY(1,1),
+	title			varchar(30),
+	min_salary		money,
+	max_salary		money,
+	remote_work_days int,
+
+	CONSTRAINT PK_position_id PRIMARY KEY (position_id),
+);
+
 CREATE TABLE HR_Bendig_Pecyna_Szubert_Michalak..Contracts(
 	contract_id		int				IDENTITY(1,1),
 	employee_id		int,
+	position_id		int,
 	hire_date		date,
 	end_date		date,
+	salary			money,
 	vacation_days	int,
 
 	CONSTRAINT PK_contract_id PRIMARY KEY (contract_id),
-	CONSTRAINT FKcontracts_employee_id FOREIGN KEY (employee_id) REFERENCES HR_Bendig_Pecyna_Szubert_Michalak..Employees (employee_id)
+	CONSTRAINT FKcontracts_employee_id FOREIGN KEY (employee_id) REFERENCES HR_Bendig_Pecyna_Szubert_Michalak..Employees (employee_id),
+	CONSTRAINT FKcontracts_position_id FOREIGN KEY (position_id) REFERENCES HR_Bendig_Pecyna_Szubert_Michalak..Positions (position_id)
 );
 
 CREATE TABLE HR_Bendig_Pecyna_Szubert_Michalak..Job_history(
@@ -71,14 +82,7 @@ CREATE TABLE HR_Bendig_Pecyna_Szubert_Michalak..Job_history(
 	CONSTRAINT FKjob_history_employee_id FOREIGN KEY (employee_id) REFERENCES HR_Bendig_Pecyna_Szubert_Michalak..Employees (employee_id)
 );
 
-CREATE TABLE HR_Bendig_Pecyna_Szubert_Michalak..Positions(
-	position_id		int				IDENTITY(1,1),
-	min_salary		money,
-	max_salary		money,
-	remote_work_days int,
 
-	CONSTRAINT PK_position_id PRIMARY KEY (position_id),
-);
 
 CREATE TABLE HR_Bendig_Pecyna_Szubert_Michalak..Departments(
 	department_id		int			IDENTITY(1,1),
@@ -100,7 +104,4 @@ CREATE TABLE HR_Bendig_Pecyna_Szubert_Michalak..Teams(
 );
 
 ALTER TABLE  HR_Bendig_Pecyna_Szubert_Michalak..Employees ADD FOREIGN KEY (team_id) REFERENCES HR_Bendig_Pecyna_Szubert_Michalak..Teams (team_id);
-ALTER TABLE  HR_Bendig_Pecyna_Szubert_Michalak..Employees ADD FOREIGN KEY (position_id) REFERENCES HR_Bendig_Pecyna_Szubert_Michalak..Positions (position_id);
-
-
 GO
