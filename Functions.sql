@@ -81,43 +81,57 @@ END;
 GO
 
 CREATE OR ALTER FUNCTION AverageRemoteWork(
-	@employee INT
+	@employee INT,
+	@month INT,
+	@year INT
 ) 
 RETURNS DECIMAL(5,0)
 AS
  BEGIN
- 	DECLARE @worked_days INT, @worked_remote_days INT, @remote_days_percentage DECIMAL(5,2)
-	SET @worked_days = 0
+ 	DECLARE @worked_days_this_month INT = 0, @remote_days_this_month INT = 0, @vacations_days_this_month INT = 0, @remote_days_percentage DECIMAL(5,2)
+	DECLARE @month_start date = DATEFROMPARTS(@year, @month ,1), @month_end date = EOMONTH(DATEFROMPARTS(@year, @month ,1))
+	
 	------------------------------------------------------------------------------------------------------------------------------------------------------
-	DECLARE Kursor CURSOR FOR (SELECT hire_date, end_date FROM Contracts WHERE employee_id = @employee)
-	DECLARE @start_date datetime, @end_date datetime
-	DECLARE @working_days INT = 0
+	DECLARE KursorRemoteDays CURSOR FOR (SELECT nr_days FROM Remote_work WHERE employee_id = @employee)
+	DECLARE @remote_days_from_cursor INT = 0
 
-	OPEN Kursor
-	FETCH NEXT FROM Kursor INTO @start_date, @end_date
+	OPEN KursorRemoteDays
+	FETCH NEXT FROM KursorRemoteDays INTO @remote_days_from_cursor
 	WHILE @@FETCH_STATUS = 0
 	BEGIN
-		IF (@end_date IS NULL) 
-			BEGIN
-				SET @end_date = GETDATE()
-			END
-		FETCH NEXT FROM Kursor INTO @start_date, @end_date
-		
-		SET @working_days = (SELECT(DATEDIFF(dd, @start_date, @end_date) + 1)-(DATEDIFF(wk, @start_date, @end_date) * 2)-(CASE WHEN DATENAME(dw, @start_date) = 'Sunday' THEN 1 ELSE 0 END)-(CASE WHEN DATENAME(dw, @end_date) = 'Saturday' THEN 1 ELSE 0 END))
-		SET @worked_days = (@worked_days + @working_days)
+		FETCH NEXT FROM KursorRemoteDays INTO @remote_days_from_cursor
+		SET @remote_days_this_month = (@remote_days_this_month + @remote_days_from_cursor)
 	END
 
-	CLOSE Kursor
-	DEALLOCATE Kursor	
+	CLOSE KursorRemoteDays
+	DEALLOCATE KursorRemoteDays	
 	------------------------------------------------------------------------------------------------------------------------------------------------------
-	SET @worked_remote_days = (SELECT SUM(remote_work_used) FROM Job_history WHERE employee_id = @employee)
-	SET @remote_days_percentage = CAST(@worked_days AS DECIMAL (9,2))/CAST(@worked_remote_days AS DECIMAL (9,2)) * 100
+	DECLARE KursorVacations CURSOR FOR (SELECT nr_days FROM Vacations WHERE employee_id = @employee)
+	DECLARE @vacation_days_from_cursor INT = 0
+
+	OPEN KursorVacations
+	FETCH NEXT FROM KursorVacations INTO @vacation_days_from_cursor
+	WHILE @@FETCH_STATUS = 0
+	BEGIN
+		FETCH NEXT FROM KursorVacations INTO @vacation_days_from_cursor
+		SET @vacations_days_this_month = (@vacations_days_this_month + @vacation_days_from_cursor)
+	END
+
+	CLOSE KursorVacations
+	DEALLOCATE KursorVacations
+	------------------------------------------------------------------------------------------------------------------------------------------------------
+	SET @worked_days_this_month = (SELECT(DATEDIFF(dd, @month_start, @month_end) + 1)-(DATEDIFF(wk, @month_start, @month_end) * 2)-(CASE WHEN DATENAME(dw, @month_start) = 'Sunday' THEN 1 ELSE 0 END)-(CASE WHEN DATENAME(dw, @month_end) = 'Saturday' THEN 1 ELSE 0 END))
+	SET @worked_days_this_month = @worked_days_this_month - @vacations_days_this_month
+	IF (@remote_days_this_month <> 0)
+	BEGIN
+		SET @remote_days_percentage = CAST(@remote_days_this_month AS DECIMAL (9,2))/CAST(@worked_days_this_month AS DECIMAL (9,2)) * 100
+	END
 	RETURN @remote_days_percentage
  END
 GO
 
-SELECT DISTINCT employee_id, dbo.AverageRemoteWork(employee_id) as remote_days_percentage FROM Employees 
-GO 
+SELECT DISTINCT employee_id, dbo.AverageRemoteWork(employee_id, 1, 2019) as remote_days_percentage FROM Employees 
+GO
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- Możliwość przyznania podwyżki wszystkim pracownikom na raz. Podwyżka przyznawana procentowo na bazie obecnych zarobków każdego pracownika
