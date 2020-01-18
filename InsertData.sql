@@ -477,6 +477,12 @@ INSERT INTO Contracts (contract_id, employee_id, position_id, hire_date, end_dat
 INSERT INTO Contracts (contract_id, employee_id, position_id, hire_date, end_date) VALUES (58,58,7,DATEFROMPARTS(2019,11,1),DATEFROMPARTS(2020,1,30))
 INSERT INTO Contracts (contract_id, employee_id, position_id, hire_date, end_date) VALUES (59,59,9,DATEFROMPARTS(2019,6,1),DATEFROMPARTS(2022,12,31))
 INSERT INTO Contracts (contract_id, employee_id, position_id, hire_date, end_date) VALUES (60,60,4,DATEFROMPARTS(2019,6,1),DATEFROMPARTS(2022,12,31))
+
+UPDATE Contracts SET salary = 4200 WHERE contract_id = 1 OR contract_id = 3 OR contract_id = 11 OR contract_id = 13;
+UPDATE Contracts SET salary = 5500 WHERE contract_id = 44 OR contract_id = 49 OR contract_id = 10;
+UPDATE Contracts SET salary = 5500 WHERE contract_id = 44 OR contract_id = 49 OR contract_id = 10;
+UPDATE Contracts SET salary = 7000 WHERE contract_id = 19 OR contract_id = 58;
+
 SET IDENTITY_INSERT Contracts OFF
 GO
 

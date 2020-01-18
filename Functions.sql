@@ -1,26 +1,26 @@
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
--- Dodawanie/usuwanie pracownikow
+USE HR_Bendig_Pecyna_Szubert_Michalak;
+GO
 
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
--- Wyświetlanie informacji na temat poszczególnych wierszy we wszystkich tabelach (imie/nazwisko/stanowisko/ staż pracy/ zarobki/do kiedy umowa/ dni urlopu/ ilość dni na l4/ czy wykorzystano urlop 14dniowy)
+---- Wyświetlenie pracowników, należących do poszczególnych zespołów
+SELECT team_name, Employees.first_name, Employees.last_name FROM Teams LEFT JOIN Employees ON Employees.team_id = Teams.team_id
 
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
--- Wyświetlanie pracowników należących do poszczególnych zespołów
+-----Policzenie ilu pracowników należy do danego zespołu
+SELECT Teams.team_name, COUNT(Employees.employee_id) FROM Teams LEFT JOIN Employees ON Employees.team_id = Teams.team_id GROUP BY Teams.team_name
 
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
--- Wyświetlanie wszystkich pracowników podglegających danemu kierownikowi
+----Wyświetlenie jakimi zespołami zarządza dany manager
+SELECT Employees.first_name, Employees.last_name, Teams.team_name FROM Teams RIGHT JOIN Employees ON Teams.manager_id = Employees.employee_id WHERE team_name IS NOT NULL
 
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
--- Sprawdzenie ilości pracy zdalnej pobranych od początku roku
+----Wyświetlenie pracowników podlegających pod danego managera
+SELECT  manager.first_name AS 'manager_imie' ,manager.last_name AS 'manager_nazwisko', employee.first_name AS 'Pracownik_imie', employee.last_name AS 'Pracownik_nazwisko' FROM Employees AS employee JOIN Teams ON Teams.team_id = employee.team_id JOIN Employees AS manager ON Teams.manager_id = manager.employee_id ORDER BY manager.employee_id
 
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
--- Wyliczenie średniej liczby dni pracy zdalnej z dokładnością do .00 ( w skali miesiąca)
+----Sprawdzenie ile dni pracy zdalnej wykorzystał dany pracownik
+SELECT Employees.employee_id, Employees.first_name, Employees.last_name, SUM(Remote_work.nr_days) AS 'Laczna_ilosc_dni' FROM Employees JOIN Remote_work ON Employees.employee_id = Remote_work.employee_id GROUP BY Employees.employee_id, Employees.first_name, Employees.last_name
 
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
--- Przyznawanie podwyżek pracownikom
+----Wyświetlenie wszystkich pracowników zatrudnionych w danym miesiącu
+SELECT YEAR(Contracts.hire_date) AS 'year', MONTH(Contracts.hire_date) AS 'month', Employees.first_name, Employees.last_name FROM Contracts JOIN Employees ON Contracts.employee_id = Employees.employee_id GROUP BY YEAR(Contracts.hire_date), MONTH(Contracts.hire_date), Employees.first_name, Employees.last_name
 
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
--- Zmiana pensji pojedyńczemu pracownikowi
+---- Wyświetlenie pracowników, którzy zarabiają pensję minimalną dla swjoego stanowiska
+SELECT Employees.first_name, Employees.last_name, Contracts.salary, Positions.min_salary FROM Employees JOIN Contracts ON Contracts.employee_id = Employees.employee_id JOIN Positions ON Positions.position_id = Contracts.position_id WHERE Contracts.salary != Positions.min_salary;
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- Wpisanie z automatu pracownikowi 20-u dni urlopu lub odpowiednio mniej w przypadku rozpoczecia pracy w srodku roku, poprawki do 26-u dni manualnie po otrzymaniu swiadectwa pracy.
@@ -72,8 +72,28 @@ IF ((SELECT COUNT(contract_id) FROM Contracts WHERE employee_id = @lastId) = 0)
 	END;
 END;
 
+GO
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- Zapewnienie aby po zmianie stanowiska pensja jest większa/równa minimalnym widełkom.
+
+CREATE TRIGGER MinSalary ON Contracts AFTER INSERT AS BEGIN
+DECLARE @employeeId INT;
+DECLARE @salary money;
+DECLARE @position INT;
+DECLARE @contract_id INT;
+DECLARE @min_salary money;
+
+SET @employeeId = (SELECT employee_id FROM inserted);
+SET @position = (SELECT position_id FROM inserted);
+SET @salary = (SELECT salary FROM inserted);
+SET @contract_id = (SELECT contract_id FROM inserted);
+SET @min_salary = (SELECT min_salary FROM Positions WHERE position_id = @position);
+
+IF (@salary IS NULL OR @salary < @min_salary)
+	UPDATE Contracts SET salary = @min_salary WHERE contract_id = @contract_id;
+
+END;
+
 
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 -- Obliczenie średniej ilości pracy zdalnej
